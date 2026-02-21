@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Overlays RateMyProfessors ratings on your school's Schedule Builder and suggests better-rated professors.",
   "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://www.ratemyprofessors.com/*"],
+  "host_permissions": ["https://www.ratemyprofessors.com/*", "https://fonts.googleapis.com/*", "https://fonts.gstatic.com/*"],
   "web_accessible_resources": [
     {
       "matches": ["<all_urls>"],

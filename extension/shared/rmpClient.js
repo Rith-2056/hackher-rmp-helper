@@ -15,3 +15,17 @@ export async function fetchTeacherById(teacherId) {
   });
 }
 
+export async function fetchAlternativesForCourse(course, currentProfessorName, currentRating, schoolId) {
+  return await chrome.runtime.sendMessage({
+    type: "RMP_FETCH_ALTERNATIVES",
+    payload: { course, currentProfessorName, currentRating, schoolId }
+  });
+}
+
+export async function fetchAllProfessorsForSubject(subject, schoolId) {
+  return await chrome.runtime.sendMessage({
+    type: "RMP_FETCH_ALL_FOR_SUBJECT",
+    payload: { subject, schoolId }
+  });
+}
+

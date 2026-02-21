@@ -43,6 +43,7 @@ export const StorageKeys = {
   rmpSchoolId: "cfg.rmpSchoolId",
   weights: "cfg.weights",
   badgeColor: "cfg.badgeColor", // hex, e.g. #1f6feb
+  geminiApiKey: "cfg.geminiApiKey",
   manualMappings: "cfg.manualMappings", // { normalizedScheduleName: rmpTeacherId }
   ratingsCachePrefix: "cache.prof.",    // + composite key
   cacheTTLms: "cfg.cacheTTLms"

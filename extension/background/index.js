@@ -117,6 +117,82 @@ async function searchTeachersByName(text, schoolId) {
   }
 }
 
+// Subject code -> RMP search terms (RMP often indexes by department name)
+const SUBJECT_SEARCH_TERMS = {
+  STAT: "Statistics",
+  STATS: "Statistics",
+  MATH: "Mathematics",
+  CS: "Computer Science",
+  CMPSCI: "Computer Science",
+  COMPSCI: "Computer Science",
+  ECON: "Economics",
+  PSYCH: "Psychology",
+  HIST: "History",
+  CHEM: "Chemistry",
+  PHYS: "Physics",
+  BIO: "Biology",
+  BIOL: "Biology",
+  ENGL: "English",
+  POLI: "Political Science",
+  SOC: "Sociology"
+};
+
+function getSearchTermForSubject(subject) {
+  const key = (subject || "").toUpperCase().replace(/\s+/g, "");
+  return SUBJECT_SEARCH_TERMS[key] || subject || "";
+}
+
+// Get ALL professors for a subject at UMass (no rating filter). Sorted by rating.
+async function fetchAllProfessorsForSubject(subject, schoolId) {
+  if (!schoolId) return [];
+  const rawSubject = (subject || "").split(/\s+/)[0] || "";
+  if (!rawSubject || rawSubject.length < 2) return [];
+  const searchTerm = getSearchTermForSubject(rawSubject) || rawSubject;
+
+  const candidates = await searchTeachersByName(searchTerm, schoolId);
+  const pool = candidates
+    .filter((c) => c.school?.id === schoolId)
+    .filter((c) => (c.numRatings || 0) >= 1)
+    .sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
+
+  return pool.map((c) => ({
+    name: `${c.firstName || ""} ${c.lastName || ""}`.trim(),
+    avgRating: c.avgRating,
+    avgDifficulty: c.avgDifficulty,
+    numRatings: c.numRatings,
+    department: c.department
+  }));
+}
+
+// Get alternative professors from UMass (same dept/subject) with higher ratings than current.
+// Used when current professor has a low rating and we want to suggest others not on the schedule.
+async function fetchAlternativesForCourse(course, currentProfessorName, currentRating, schoolId) {
+  if (!schoolId) return [];
+  const subject = (course || "").split(/\s+/)[0] || "";
+  if (!subject || subject.length < 2) return [];
+  const minRating = Math.max(2.5, (currentRating || 0) + 0.5);
+  const currentKey = normalizeNameForKey(currentProfessorName || "");
+  const searchTerm = getSearchTermForSubject(subject) || subject;
+
+  const candidates = await searchTeachersByName(searchTerm, schoolId);
+  const pool = candidates
+    .filter((c) => c.school?.id === schoolId)
+    .filter((c) => {
+      const key = normalizeNameForKey(`${c.firstName || ""} ${c.lastName || ""}`);
+      return key !== currentKey;
+    })
+    .filter((c) => (c.avgRating || 0) >= minRating && (c.numRatings || 0) >= 1)
+    .sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
+
+  return pool.slice(0, 5).map((c) => ({
+    name: `${c.firstName || ""} ${c.lastName || ""}`.trim(),
+    avgRating: c.avgRating,
+    avgDifficulty: c.avgDifficulty,
+    numRatings: c.numRatings,
+    department: c.department
+  }));
+}
+
 async function getTeacherSummary(id) {
   try {
     const data = await enqueue(() => rmpGraphQL(TEACHER_RATINGS_SUMMARY_QUERY, { id }));
@@ -244,9 +320,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return { ok: true };
     }
     if (msg.type === "CACHE_CLEAR") {
-      // naive: clear all local storage
       await chrome.storage.local.clear();
       return { ok: true };
+    }
+    if (msg.type === "RMP_FETCH_ALTERNATIVES") {
+      const { course, currentProfessorName, currentRating, schoolId: sid } = msg.payload || {};
+      const schoolId = sid || (await Storage.get(StorageKeys.rmpSchoolId));
+      return fetchAlternativesForCourse(course, currentProfessorName, currentRating, schoolId);
+    }
+    if (msg.type === "RMP_FETCH_ALL_FOR_SUBJECT") {
+      const { subject, schoolId: sid } = msg.payload || {};
+      const schoolId = sid || (await Storage.get(StorageKeys.rmpSchoolId));
+      return fetchAllProfessorsForSubject(subject, schoolId);
     }
     return undefined;
   };

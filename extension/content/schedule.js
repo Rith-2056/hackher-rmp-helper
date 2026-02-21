@@ -1,4 +1,4 @@
-import { fetchTeacherForNameBatch } from "../shared/rmpClient.js";
+import { fetchTeacherForNameBatch, fetchAlternativesForCourse } from "../shared/rmpClient.js";
 import { getWeights } from "../shared/storage.js";
 import { normalizeWhitespace, normalizeNameForKey } from "../shared/nameMatcher.js";
 
@@ -21,6 +21,11 @@ const NON_NAME_WORDS = new Set([
 function isPersonName(text) {
   if (!NAME_RE.test(text)) return false;
   return !text.split(/\s+/).some((w) => NON_NAME_WORDS.has(w));
+}
+
+function escapeHtml(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 // Find instructor-name TDs in any schedule table.
@@ -404,23 +409,47 @@ async function scanAndAnnotate() {
   }
 }
 
+function showFloatingTooltip(badgeEl, html) {
+  const doc = badgeEl.ownerDocument || document;
+  const tip = doc.createElement("div");
+  tip.className = "rmp-badge-tooltip rmp-floating-tooltip";
+  tip.innerHTML = html;
+  doc.body.appendChild(tip);
+  const updatePos = () => {
+    const r = badgeEl.getBoundingClientRect();
+    /* Place tooltip on the bubble: bottom edge meets top of badge for stacked symmetry */
+    tip.style.left = `${r.left + r.width / 2}px`;
+    tip.style.top = `${r.top}px`;
+  };
+  updatePos();
+  const hide = () => {
+    tip.remove();
+    badgeEl.removeEventListener("mouseleave", hide);
+  };
+  badgeEl.addEventListener("mouseleave", hide);
+  requestAnimationFrame(() => tip.classList.add("rmp-tooltip-visible"));
+}
+
 function annotateElement(el, name, rating) {
   // idempotent: avoid duplicate badges
   if (el.querySelector?.(".rmp-badge")) return;
+  const wrapper = document.createElement("span");
+  wrapper.className = "rmp-badge-wrapper";
   const badge = document.createElement("span");
   badge.className = "rmp-badge";
   let text = "RMP n/a";
-  let title = "No RMP profile found";
+  let tooltipHtml = "No RMP profile found";
   if (rating && !rating.notFound) {
     const r = Number(rating.avgRating || 0).toFixed(1);
     const d = Number(rating.avgDifficulty || 0).toFixed(1);
     const n = rating.numRatings || 0;
     text = `${r} · Diff ${d} (${n})`;
-    title = `${name}\nOverall: ${r}\nDifficulty: ${d}\nRatings: ${n}${rating.department ? `\nDept: ${rating.department}` : ""}`;
+    tooltipHtml = `Name: ${escapeHtml(name)}<br>Rating: ${r}<br>Difficulty: ${d}<br>Ratings: ${n} reviews<br>Department: ${escapeHtml(rating.department || "—")}`;
   }
   badge.textContent = text;
-  badge.title = title;
-  el.appendChild(badge);
+  badge.addEventListener("mouseenter", () => showFloatingTooltip(badge, tooltipHtml));
+  wrapper.appendChild(badge);
+  el.appendChild(wrapper);
 }
 
 // Calendar block badge: compact, readable on colored backgrounds. Idempotent.
@@ -428,20 +457,23 @@ function annotateCalendarBlock(anchorEl, name, rating) {
   if (!anchorEl) return;
   const doc = anchorEl.ownerDocument || document;
   if (anchorEl.querySelector?.(".rmp-calendar-badge")) return;
+  const wrapper = doc.createElement("span");
+  wrapper.className = "rmp-badge-wrapper rmp-calendar-wrapper";
   const badge = doc.createElement("span");
   badge.className = "rmp-calendar-badge";
   let text = "No RMP";
-  let title = "No RMP profile found";
+  let tooltipHtml = "No RMP profile found";
   if (rating && !rating.notFound) {
     const r = Number(rating.avgRating || 0).toFixed(1);
     const d = Number(rating.avgDifficulty || 0).toFixed(1);
     const n = rating.numRatings || 0;
     text = `${r} · Diff ${d} (${n})`;
-    title = `${name}\nOverall: ${r}\nDifficulty: ${d}\nRatings: ${n}`;
+    tooltipHtml = `Name: ${escapeHtml(name)}<br>Rating: ${r}<br>Difficulty: ${d}<br>Ratings: ${n} reviews<br>Department: ${escapeHtml(rating.department || "—")}`;
   }
   badge.textContent = text;
-  badge.title = title;
-  anchorEl.appendChild(badge);
+  badge.addEventListener("mouseenter", () => showFloatingTooltip(badge, tooltipHtml));
+  wrapper.appendChild(badge);
+  anchorEl.appendChild(wrapper);
 }
 
 // Scan calendar grid, badge first occurrence of each professor only.
@@ -609,8 +641,25 @@ async function openRecommendationsDrawer() {
     if (best && curr && best !== curr) {
       const note = document.createElement("div");
       note.className = "rmp-swap-note";
-      note.textContent = `Best option: ${best.name}`;
+      note.textContent = `Best on schedule: ${best.name}`;
       courseBlock.appendChild(note);
+    }
+    const lowRated = sections.filter((s) => (s.rating?.avgRating ?? 0) > 0 && (s.rating?.avgRating ?? 0) < 3.5);
+    if (lowRated.length > 0) {
+      (async () => {
+        for (const s of lowRated) {
+          try {
+            const alts = await fetchAlternativesForCourse(course, s.name, s.rating?.avgRating ?? 0);
+            if (alts?.length) {
+              const div = document.createElement("div");
+              div.className = "rmp-umass-alts";
+              div.innerHTML = `<strong>Other UMass professors for ${course.split(/\s+/)[0]}:</strong><ul>${alts.map((a) => `<li>${a.name} — ⭐ ${Number(a.avgRating).toFixed(1)} · Diff ${Number(a.avgDifficulty || 0).toFixed(1)} (${a.numRatings || 0})</li>`).join("")}</ul>`;
+              courseBlock.appendChild(div);
+              break;
+            }
+          } catch (_) {}
+        }
+      })();
     }
     courseBlock.appendChild(list);
     body.appendChild(courseBlock);
@@ -640,14 +689,22 @@ async function getPopupData() {
     });
     const best = ranked[0];
     for (const s of sections) {
-      if (!isPersonName(s.name)) continue; // only real professor names, not course titles
+      if (!isPersonName(s.name)) continue;
       const alt = best && best.name !== s.name ? { name: best.name, rating: best.rating } : null;
+      const currRating = s.rating?.avgRating ?? 0;
+      let rmpAlternatives = [];
+      if (currRating > 0 && currRating < 3.5) {
+        try {
+          rmpAlternatives = (await fetchAlternativesForCourse(course, s.name, currRating)) || [];
+        } catch (_) {}
+      }
       professors.push({
         name: s.name,
         course,
         rating: s.rating,
         timeText: s.timeText,
-        bestAlternative: alt
+        bestAlternative: alt,
+        rmpAlternatives
       });
     }
   }

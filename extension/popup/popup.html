@@ -22,13 +22,19 @@
       .prof-alt { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e2e8f0; font-size: 12px; color: #059669; }
       .btn-alt { padding: 4px 8px; font-size: 11px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 6px; }
       .btn-alt:hover { background: #059669; }
+      .btn-view-all { padding: 4px 8px; font-size: 11px; background: #1e40af; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 6px; display: block; }
+      .btn-view-all:hover { background: #1e3a8a; }
       .prompt-section { border-top: 1px solid #e2e8f0; padding-top: 12px; }
       .prompt-label { font-size: 12px; color: #64748b; margin-bottom: 6px; }
-      .prompt-input { width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; box-sizing: border-box; }
-      .prompt-input::placeholder { color: #94a3b8; }
-      .btn-reco { width: 100%; padding: 10px; margin-top: 8px; background: #1f6feb; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; }
-      .btn-reco:hover { background: #1d6ae5; }
+      .prompt-buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+      .btn-reco { flex: 1; min-width: 120px; padding: 10px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; }
+      .btn-reco:hover { background: #059669; }
+      .btn-drawer { flex: 1; min-width: 120px; padding: 10px; background: #1f6feb; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; }
+      .btn-drawer:hover { background: #1d6ae5; }
+      .reco-response { margin-top: 10px; padding: 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; font-size: 14px; line-height: 1.6; color: #166534; white-space: pre-wrap; max-height: 280px; overflow-y: auto; min-height: 48px; }
+      .reco-response.empty { background: #f8fafc; border-color: #e2e8f0; color: #64748b; }
       .empty-msg { color: #64748b; font-size: 13px; padding: 16px 0; text-align: center; }
+      .popup-tip { font-size: 11px; color: #94a3b8; margin-top: 8px; }
       .options-link { display: block; margin-top: 12px; font-size: 12px; color: #64748b; text-align: center; }
     </style>
   </head>
@@ -36,11 +42,15 @@
     <h1>RMP Helper</h1>
     <div class="prof-list" id="profList"></div>
     <div class="prompt-section">
-      <div class="prompt-label">Ask about professors</div>
-      <input type="text" id="promptInput" class="prompt-input" placeholder="e.g., Who's better for CompSci 250?" />
-      <button id="btnReco" class="btn-reco">Open full recommendations</button>
+      <div class="prompt-label">Recommendations</div>
+      <div class="prompt-buttons">
+        <button id="btnReco" class="btn-reco">Get recommendations</button>
+        <button id="btnDrawer" class="btn-drawer">Open full drawer</button>
+      </div>
+      <div id="recoResponse" class="reco-response" style="display:none;"></div>
     </div>
     <a href="../options/options.html" target="_blank" class="options-link">Open options</a>
+    <p class="popup-tip">Hover rating badges on the schedule page for full details.</p>
     <script type="module" src="./popup.js"></script>
   </body>
 </html>
