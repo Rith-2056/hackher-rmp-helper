@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Node (future-proof)
+node_modules/
+npm-debug.log*
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
