@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RMP Helper</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial; margin: 12px; width: 300px; }
+      h1 { font-size: 16px; margin: 0 0 8px; }
+      .row { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; }
+      .btn { padding: 8px 10px; background: #1f6feb; color: white; border: none; border-radius: 6px; cursor: pointer; }
+      .small { font-size: 12px; color: #6b7280; }
+      .slider-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+      input[type=range] { width: 180px; }
+      label { font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h1>RMP Helper</h1>
+    <div class="row"><button id="btn-reco" class="btn">Are there better professors?</button></div>
+    <div class="row slider-row">
+      <label for="overall">Overall weight</label>
+      <input id="overall" type="range" min="0" max="1" step="0.05" value="0.7">
+    </div>
+    <div class="row slider-row">
+      <label for="difficulty">Difficulty weight</label>
+      <input id="difficulty" type="range" min="0" max="1" step="0.05" value="0.3">
+    </div>
+    <div class="row">
+      <button id="save" class="btn">Save weights</button>
+      <span class="small" id="status"></span>
+    </div>
+    <div class="row">
+      <a href="../options/options.html" target="_blank">Open options</a>
+    </div>
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>
+

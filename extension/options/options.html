@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RMP Helper Options</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial; margin: 16px; max-width: 760px; }
+      h1 { font-size: 18px; margin-top: 0; }
+      section { margin: 18px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
+      label { display: block; font-size: 13px; margin: 6px 0; }
+      input[type=text] { width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      .btn { padding: 8px 10px; background: #1f6feb; color: white; border: none; border-radius: 6px; cursor: pointer; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 13px; }
+      .small { color: #6b7280; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>RMP Helper Options</h1>
+
+    <section>
+      <h2>Site & School</h2>
+      <label>Schedule Builder domain (e.g., <code>schedule.university.edu</code>)
+        <input id="domain" type="text" placeholder="schedule.example.edu" />
+      </label>
+      <label>RateMyProfessors School ID
+        <input id="schoolId" type="text" placeholder="e.g., U2Nob29sLTQyMzQ5" />
+      </label>
+      <div class="row">
+        <button id="saveCfg" class="btn">Save settings</button>
+        <span id="cfgStatus" class="small"></span>
+      </div>
+    </section>
+
+    <section>
+      <h2>Manual Name → RMP Mapping</h2>
+      <p class="small">Use this when a professor's display name on the schedule doesn't match RMP search well. Provide the schedule name and the RMP Teacher ID.</p>
+      <div class="row">
+        <input id="mapName" type="text" placeholder="e.g., J. Doe" />
+        <input id="mapId" type="text" placeholder="RMP teacher ID (gid)" />
+        <button id="addMap" class="btn">Add mapping</button>
+      </div>
+      <table>
+        <thead><tr><th>Schedule Name (normalized)</th><th>RMP Teacher ID</th><th></th></tr></thead>
+        <tbody id="mapTable"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Cache</h2>
+      <div class="row">
+        <button id="clearCache" class="btn">Clear cached ratings</button>
+        <span id="cacheStatus" class="small"></span>
+      </div>
+    </section>
+
+    <script type="module" src="./options.js"></script>
+  </body>
+  </html>
+
