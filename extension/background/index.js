@@ -159,8 +159,16 @@ async function getCachedOrFetchRating(schoolId, scheduleName) {
   }
 
   const candidates = await searchTeachersByName(scheduleName, schoolId);
-  // Pick best candidate by last/first match and rating count
-  const best = pickBestCandidate(scheduleName, candidates);
+  // When a school is configured, only accept professors from that school.
+  // Never fall back to another school — that would show the wrong person.
+  const pool = schoolId
+    ? candidates.filter((c) => c.school?.id === schoolId)
+    : candidates;
+  if (pool.length === 0) {
+    await Storage.setWithTTL(cacheKey, { notFound: true }, ttlMs);
+    return { notFound: true };
+  }
+  const best = pickBestCandidate(scheduleName, pool);
   if (!best) {
     await Storage.setWithTTL(cacheKey, { notFound: true }, ttlMs);
     return { notFound: true };
@@ -180,11 +188,12 @@ function pickBestCandidate(scheduleName, candidates) {
   );
   const pool = withFirst.length > 0 ? withFirst : filtered.length > 0 ? filtered : candidates;
   if (pool.length === 0) return null;
+  // Prefer exact full-name match; break ties by numRatings
   pool.sort((a, b) => {
-    const nr = (b.numRatings || 0) - (a.numRatings || 0);
-    if (nr !== 0) return nr;
-    const r = (b.avgRating || 0) - (a.avgRating || 0);
-    return r;
+    const aExact = a.firstName?.toUpperCase() === firstU && a.lastName?.toUpperCase() === lastU ? 1 : 0;
+    const bExact = b.firstName?.toUpperCase() === firstU && b.lastName?.toUpperCase() === lastU ? 1 : 0;
+    if (bExact !== aExact) return bExact - aExact;
+    return (b.numRatings || 0) - (a.numRatings || 0);
   });
   return simplifyTeacher(pool[0]);
 }
@@ -223,13 +232,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const scheduleDomain = await Storage.get(StorageKeys.scheduleDomain);
       const rmpSchoolId = await Storage.get(StorageKeys.rmpSchoolId);
       const weights = await Storage.getJSON(StorageKeys.weights);
-      return { scheduleDomain, rmpSchoolId, weights };
+      const badgeColor = await Storage.get(StorageKeys.badgeColor);
+      return { scheduleDomain, rmpSchoolId, weights, badgeColor };
     }
     if (msg.type === "CFG_SET") {
-      const { scheduleDomain, rmpSchoolId, weights } = msg.payload || {};
+      const { scheduleDomain, rmpSchoolId, weights, badgeColor } = msg.payload || {};
       if (scheduleDomain !== undefined) await Storage.set(StorageKeys.scheduleDomain, scheduleDomain);
       if (rmpSchoolId !== undefined) await Storage.set(StorageKeys.rmpSchoolId, rmpSchoolId);
       if (weights !== undefined) await Storage.setJSON(StorageKeys.weights, weights);
+      if (badgeColor !== undefined) await Storage.set(StorageKeys.badgeColor, badgeColor);
       return { ok: true };
     }
     if (msg.type === "CACHE_CLEAR") {

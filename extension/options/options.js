@@ -1,11 +1,17 @@
 import { Storage, StorageKeys } from "../shared/storage.js";
 import { normalizeNameForKey } from "../shared/nameMatcher.js";
 
+const DEFAULT_BADGE_COLOR = "#1f6feb";
+
 async function loadCfg() {
   const domain = await Storage.get(StorageKeys.scheduleDomain);
   const schoolId = await Storage.get(StorageKeys.rmpSchoolId);
+  const badgeColor = (await Storage.get(StorageKeys.badgeColor)) ?? DEFAULT_BADGE_COLOR;
   document.getElementById("domain").value = domain ?? "";
   document.getElementById("schoolId").value = schoolId ?? "";
+  const hex = badgeColor.startsWith("#") ? badgeColor : `#${badgeColor}`;
+  document.getElementById("badgeColor").value = hex;
+  document.getElementById("badgeColorHex").value = hex;
 }
 
 async function saveCfg() {
@@ -16,6 +22,19 @@ async function saveCfg() {
     payload: { scheduleDomain, rmpSchoolId }
   });
   const s = document.getElementById("cfgStatus");
+  s.textContent = "Saved";
+  setTimeout(() => (s.textContent = ""), 1200);
+}
+
+async function saveColor() {
+  let badgeColor = document.getElementById("badgeColorHex").value.trim();
+  if (!badgeColor.startsWith("#")) badgeColor = "#" + badgeColor;
+  if (!/^#[0-9A-Fa-f]{6}$/.test(badgeColor)) badgeColor = DEFAULT_BADGE_COLOR;
+  await chrome.runtime.sendMessage({
+    type: "CFG_SET",
+    payload: { badgeColor }
+  });
+  const s = document.getElementById("colorStatus");
   s.textContent = "Saved";
   setTimeout(() => (s.textContent = ""), 1200);
 }
@@ -67,8 +86,18 @@ async function clearCache() {
 }
 
 document.getElementById("saveCfg").addEventListener("click", saveCfg);
+document.getElementById("saveColor").addEventListener("click", saveColor);
 document.getElementById("addMap").addEventListener("click", addMapping);
 document.getElementById("clearCache").addEventListener("click", clearCache);
+
+// Sync color picker with hex input
+document.getElementById("badgeColor").addEventListener("input", (e) => {
+  document.getElementById("badgeColorHex").value = e.target.value;
+});
+document.getElementById("badgeColorHex").addEventListener("input", (e) => {
+  const v = e.target.value.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(v)) document.getElementById("badgeColor").value = v;
+});
 
 await loadCfg();
 await refreshMappings();

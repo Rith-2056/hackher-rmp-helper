@@ -42,6 +42,7 @@ export const StorageKeys = {
   scheduleDomain: "cfg.scheduleDomain",
   rmpSchoolId: "cfg.rmpSchoolId",
   weights: "cfg.weights",
+  badgeColor: "cfg.badgeColor", // hex, e.g. #1f6feb
   manualMappings: "cfg.manualMappings", // { normalizedScheduleName: rmpTeacherId }
   ratingsCachePrefix: "cache.prof.",    // + composite key
   cacheTTLms: "cfg.cacheTTLms"

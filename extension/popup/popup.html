@@ -5,35 +5,42 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>RMP Helper</title>
     <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial; margin: 12px; width: 300px; }
-      h1 { font-size: 16px; margin: 0 0 8px; }
-      .row { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; }
-      .btn { padding: 8px 10px; background: #1f6feb; color: white; border: none; border-radius: 6px; cursor: pointer; }
-      .small { font-size: 12px; color: #6b7280; }
-      .slider-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
-      input[type=range] { width: 180px; }
-      label { font-size: 13px; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 12px; width: 320px; max-height: 480px; }
+      h1 { font-size: 16px; margin: 0 0 12px; font-weight: 600; }
+      .prof-list { max-height: 220px; overflow-y: auto; margin-bottom: 12px; }
+      .prof-row {
+        padding: 8px 10px;
+        border-radius: 8px;
+        margin-bottom: 6px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+      .prof-name { font-weight: 600; font-size: 13px; color: #1e293b; }
+      .prof-course { font-size: 11px; color: #64748b; margin-top: 2px; }
+      .prof-rating { font-size: 12px; color: #475569; margin-top: 4px; }
+      .prof-rating .badge { display: inline-block; padding: 2px 6px; border-radius: 6px; background: #e0e7ff; color: #3730a3; font-weight: 500; }
+      .prof-alt { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e2e8f0; font-size: 12px; color: #059669; }
+      .btn-alt { padding: 4px 8px; font-size: 11px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 6px; }
+      .btn-alt:hover { background: #059669; }
+      .prompt-section { border-top: 1px solid #e2e8f0; padding-top: 12px; }
+      .prompt-label { font-size: 12px; color: #64748b; margin-bottom: 6px; }
+      .prompt-input { width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; box-sizing: border-box; }
+      .prompt-input::placeholder { color: #94a3b8; }
+      .btn-reco { width: 100%; padding: 10px; margin-top: 8px; background: #1f6feb; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; }
+      .btn-reco:hover { background: #1d6ae5; }
+      .empty-msg { color: #64748b; font-size: 13px; padding: 16px 0; text-align: center; }
+      .options-link { display: block; margin-top: 12px; font-size: 12px; color: #64748b; text-align: center; }
     </style>
   </head>
   <body>
     <h1>RMP Helper</h1>
-    <div class="row"><button id="btn-reco" class="btn">Are there better professors?</button></div>
-    <div class="row slider-row">
-      <label for="overall">Overall weight</label>
-      <input id="overall" type="range" min="0" max="1" step="0.05" value="0.7">
+    <div class="prof-list" id="profList"></div>
+    <div class="prompt-section">
+      <div class="prompt-label">Ask about professors</div>
+      <input type="text" id="promptInput" class="prompt-input" placeholder="e.g., Who's better for CompSci 250?" />
+      <button id="btnReco" class="btn-reco">Open full recommendations</button>
     </div>
-    <div class="row slider-row">
-      <label for="difficulty">Difficulty weight</label>
-      <input id="difficulty" type="range" min="0" max="1" step="0.05" value="0.3">
-    </div>
-    <div class="row">
-      <button id="save" class="btn">Save weights</button>
-      <span class="small" id="status"></span>
-    </div>
-    <div class="row">
-      <a href="../options/options.html" target="_blank">Open options</a>
-    </div>
+    <a href="../options/options.html" target="_blank" class="options-link">Open options</a>
     <script type="module" src="./popup.js"></script>
   </body>
 </html>
-

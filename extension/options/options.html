@@ -10,7 +10,7 @@
       section { margin: 18px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
       label { display: block; font-size: 13px; margin: 6px 0; }
       input[type=text] { width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; }
-      .row { display: flex; gap: 8px; align-items: center; }
+      .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
       .btn { padding: 8px 10px; background: #1f6feb; color: white; border: none; border-radius: 6px; cursor: pointer; }
       table { width: 100%; border-collapse: collapse; margin-top: 10px; }
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 13px; }
@@ -56,7 +56,20 @@
       </div>
     </section>
 
+    <section>
+      <h2>Badge Appearance</h2>
+      <label>Badge color (liquid glass style)
+        <div class="row" style="margin-top: 6px;">
+          <input id="badgeColor" type="color" value="#1f6feb" style="width: 48px; height: 32px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;" />
+          <input id="badgeColorHex" type="text" placeholder="#1f6feb" maxlength="7" style="width: 90px; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; font-family: monospace;" />
+        </div>
+      </label>
+      <div class="row" style="margin-top: 10px;">
+        <button id="saveColor" class="btn">Save changes</button>
+        <span id="colorStatus" class="small"></span>
+      </div>
+    </section>
+
     <script type="module" src="./options.js"></script>
   </body>
-  </html>
-
+</html>
