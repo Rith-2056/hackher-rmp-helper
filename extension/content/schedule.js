@@ -133,6 +133,25 @@ function applyBadgeColor(badgeColor) {
   el.textContent = `:root{--rmp-badge-bg:${bg};--rmp-badge-shadow:${shadow};--rmp-badge-calendar-bg:${calendarBg};}`;
 }
 
+// Rating → badge background (override at render time; config badge color is unchanged).
+// Palette: red #DC2626, yellow #FACC15, green #22C55E, bold green #15803D, gray #9CA3AF
+function getBadgeBackgroundForRating(avgRating) {
+  const R = { r: 220, g: 38, b: 38 };
+  const Y = { r: 250, g: 204, b: 21 };
+  const G = { r: 34, g: 197, b: 94 };
+  const BG = { r: 21, g: 128, b: 61 };
+  const Gray = { r: 156, g: 163, b: 175 };
+  const o = (c, a = 0.92) => `rgba(${c.r},${c.g},${c.b},${a})`;
+  if (avgRating == null || avgRating === undefined || Number.isNaN(Number(avgRating))) return o(Gray);
+  const r = Number(avgRating);
+  if (r <= 2.5) return o(R);
+  if (r < 3.0) return `linear-gradient(135deg, ${o(R)} 0%, ${o(Y)} 100%)`;
+  if (r < 3.5) return `linear-gradient(135deg, ${o(Y, 0.85)} 0%, ${o(Y)} 100%)`;
+  if (r < 3.9) return `linear-gradient(135deg, ${o(Y)} 0%, ${o(G)} 100%)`;
+  if (r < 4.5) return o(G);
+  return o(BG);
+}
+
 async function bootstrap() {
   if (STATE.initialized) return;
   const cfg = await chrome.runtime.sendMessage({ type: "CFG_GET" });
@@ -409,11 +428,12 @@ async function scanAndAnnotate() {
   }
 }
 
-function showFloatingTooltip(badgeEl, html) {
+function showFloatingTooltip(badgeEl, html, badgeBg) {
   const doc = badgeEl.ownerDocument || document;
   const tip = doc.createElement("div");
   tip.className = "rmp-badge-tooltip rmp-floating-tooltip";
   tip.innerHTML = html;
+  if (badgeBg) tip.style.background = badgeBg;
   doc.body.appendChild(tip);
   const updatePos = () => {
     const r = badgeEl.getBoundingClientRect();
@@ -437,6 +457,9 @@ function annotateElement(el, name, rating) {
   wrapper.className = "rmp-badge-wrapper";
   const badge = document.createElement("span");
   badge.className = "rmp-badge";
+  const avgRating = rating && !rating.notFound ? rating.avgRating : null;
+  const badgeBg = getBadgeBackgroundForRating(avgRating);
+  badge.style.background = badgeBg;
   let text = "RMP n/a";
   let tooltipHtml = "No RMP profile found";
   if (rating && !rating.notFound) {
@@ -447,7 +470,7 @@ function annotateElement(el, name, rating) {
     tooltipHtml = `Name: ${escapeHtml(name)}<br>Rating: ${r}<br>Difficulty: ${d}<br>Ratings: ${n} reviews<br>Department: ${escapeHtml(rating.department || "—")}`;
   }
   badge.textContent = text;
-  badge.addEventListener("mouseenter", () => showFloatingTooltip(badge, tooltipHtml));
+  badge.addEventListener("mouseenter", () => showFloatingTooltip(badge, tooltipHtml, badgeBg));
   wrapper.appendChild(badge);
   el.appendChild(wrapper);
 }
@@ -461,6 +484,9 @@ function annotateCalendarBlock(anchorEl, name, rating) {
   wrapper.className = "rmp-badge-wrapper rmp-calendar-wrapper";
   const badge = doc.createElement("span");
   badge.className = "rmp-calendar-badge";
+  const avgRating = rating && !rating.notFound ? rating.avgRating : null;
+  const badgeBg = getBadgeBackgroundForRating(avgRating);
+  badge.style.background = badgeBg;
   let text = "No RMP";
   let tooltipHtml = "No RMP profile found";
   if (rating && !rating.notFound) {
@@ -471,7 +497,7 @@ function annotateCalendarBlock(anchorEl, name, rating) {
     tooltipHtml = `Name: ${escapeHtml(name)}<br>Rating: ${r}<br>Difficulty: ${d}<br>Ratings: ${n} reviews<br>Department: ${escapeHtml(rating.department || "—")}`;
   }
   badge.textContent = text;
-  badge.addEventListener("mouseenter", () => showFloatingTooltip(badge, tooltipHtml));
+  badge.addEventListener("mouseenter", () => showFloatingTooltip(badge, tooltipHtml, badgeBg));
   wrapper.appendChild(badge);
   anchorEl.appendChild(wrapper);
 }
