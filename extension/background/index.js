@@ -1,6 +1,49 @@
 import { Storage, StorageKeys, cacheKeyForProfessor } from "../shared/storage.js";
 import { normalizeNameForKey, splitName } from "../shared/nameMatcher.js";
 
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+
+const snapshotByTab = new Map();
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "RMP_DATA_UPDATE") {
+    const tabId = sender.tab?.id;
+    const payload = msg.payload || { courses: [] };
+    if (tabId != null) snapshotByTab.set(tabId, payload);
+    chrome.runtime.sendMessage({ type: "RMP_DATA_UPDATE", payload }).catch(() => {});
+    return false;
+  }
+  if (msg.type === "OPEN_RECOMMENDATIONS") {
+    (async () => {
+      try {
+        const win = await chrome.windows.getCurrent();
+        if (win?.id) await chrome.sidePanel.open({ windowId: win.id });
+      } catch (_) {}
+      sendResponse({ ok: true });
+    })();
+    return true;
+  }
+  if (msg.type === "RMP_REQUEST_SNAPSHOT") {
+    (async () => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) {
+        sendResponse({ courses: [] });
+        return;
+      }
+      const cached = snapshotByTab.get(tab.id);
+      try {
+        const snap = await chrome.tabs.sendMessage(tab.id, { type: "RMP_REQUEST_SNAPSHOT" }, { frameId: 0 });
+        if (snap?.courses) snapshotByTab.set(tab.id, snap);
+        sendResponse(snap || cached || { courses: [] });
+      } catch (e) {
+        sendResponse(cached || { courses: [] });
+      }
+    })();
+    return true;
+  }
+  return undefined;
+});
+
 // Simple in-memory rate limiter queue for service worker lifetime
 const requestQueue = [];
 let queueRunning = false;
@@ -91,6 +134,7 @@ const TEACHER_RATINGS_SUMMARY_QUERY = `
     node(id: $id) {
       ... on Teacher {
         id
+        legacyId
         firstName
         lastName
         department
@@ -200,6 +244,7 @@ async function getTeacherSummary(id) {
     if (!t) return null;
     return {
       id: t.id,
+      legacyId: t.legacyId,
       firstName: t.firstName,
       lastName: t.lastName,
       department: t.department,
@@ -277,6 +322,7 @@ function pickBestCandidate(scheduleName, candidates) {
 function simplifyTeacher(t) {
   return {
     id: t.id,
+    legacyId: t.legacyId,
     firstName: t.firstName,
     lastName: t.lastName,
     department: t.department,
@@ -332,6 +378,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const { subject, schoolId: sid } = msg.payload || {};
       const schoolId = sid || (await Storage.get(StorageKeys.rmpSchoolId));
       return fetchAllProfessorsForSubject(subject, schoolId);
+    }
+    if (msg.type === "RMP_SEARCH_TEACHERS") {
+      const { text, schoolId: sid } = msg.payload || {};
+      const schoolId = sid || (await Storage.get(StorageKeys.rmpSchoolId));
+      const trimmed = (text || "").trim();
+      if (!trimmed || trimmed.length < 2) return [];
+      const nodes = await searchTeachersByName(trimmed, schoolId);
+      return (nodes || []).map((n) => ({
+        id: n.id,
+        legacyId: n.legacyId,
+        name: `${n.firstName || ""} ${n.lastName || ""}`.trim(),
+        firstName: n.firstName,
+        lastName: n.lastName,
+        department: n.department,
+        school: n.school,
+        avgRating: n.avgRating,
+        numRatings: n.numRatings,
+        avgDifficulty: n.avgDifficulty
+      }));
     }
     return undefined;
   };

@@ -29,3 +29,10 @@ export async function fetchAllProfessorsForSubject(subject, schoolId) {
   });
 }
 
+export async function searchProfessors(text, schoolId) {
+  return await chrome.runtime.sendMessage({
+    type: "RMP_SEARCH_TEACHERS",
+    payload: { text, schoolId }
+  });
+}
+

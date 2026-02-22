@@ -1,15 +1,27 @@
 {
   "manifest_version": 3,
-  "name": "RMP Helper – Schedule Booster",
+  "name": "ZooReviews",
   "version": "0.1.0",
   "description": "Overlays RateMyProfessors ratings on your school's Schedule Builder and suggests better-rated professors.",
-  "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://www.ratemyprofessors.com/*", "https://fonts.googleapis.com/*", "https://fonts.gstatic.com/*"],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "sidePanel",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.ratemyprofessors.com/*",
+    "https://fonts.googleapis.com/*",
+    "https://fonts.gstatic.com/*"
+  ],
   "web_accessible_resources": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "<all_urls>"
+      ],
       "resources": [
         "content/schedule.js",
+        "content/scheduleParser.js",
         "shared/storage.js",
         "shared/nameMatcher.js",
         "shared/rmpClient.js"
@@ -21,16 +33,25 @@
     "type": "module"
   },
   "action": {
-    "default_title": "RMP Helper",
-    "default_popup": "popup/popup.html"
+    "default_title": "ZooReviews"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
   },
   "options_page": "options/options.html",
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content/loader.js"],
-      "css": ["styles/overlay.css"],
-      "run_at": "document_idle"
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/loader.js"
+      ],
+      "css": [
+        "styles/overlay.css"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ]
 }

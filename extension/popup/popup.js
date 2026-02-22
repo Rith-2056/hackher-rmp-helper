@@ -33,7 +33,7 @@ async function loadProfessorData() {
 function renderProfessors(professors) {
   const container = document.getElementById("profList");
   if (!professors?.length) {
-    container.innerHTML = `<p class="empty-msg">Open a schedule page to see professor ratings here.</p>`;
+    container.innerHTML = `<p class="empty-msg">No instructor names found on this page. Professor ratings (name, rating, difficulty, department) appear here when the schedule shows instructor names.</p>`;
     return;
   }
   const seen = new Set();
