@@ -362,8 +362,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handler = async () => {
     if (msg.type === "RMP_FETCH_BATCH") {
       const { names, options } = msg.payload || {};
-      const schoolId =
-        options?.schoolId || (await Storage.get(StorageKeys.rmpSchoolId)) || null;
+      // Use nullish coalescing: if schoolId is explicitly provided (even as null), respect it;
+      // only fall back to stored config when schoolId is undefined (not provided at all).
+      const schoolId = (options && "schoolId" in options)
+        ? options.schoolId
+        : (await Storage.get(StorageKeys.rmpSchoolId)) || null;
       const out = {};
       for (const name of names || []) {
         out[name] = await getCachedOrFetchRating(schoolId, name);

@@ -524,11 +524,59 @@ function runScanGeneratedSchedules() {
   for (const doc of roots) {
     const ctx = detectPageContext(doc, location.href);
     if (ctx !== "generatedSchedules" && ctx !== "buildSchedule") continue;
-    // Do NOT scrape schedule page - user will manually add professors via sidepanel search.
-    const payload = { viewMode: "manual", schedules: [], courses: [] };
-    STATE.lastSnapshot = payload;
-    chrome.runtime.sendMessage({ type: "RMP_DATA_UPDATE", payload }).catch(() => {});
-    return Promise.resolve(payload);
+
+    // Parse schedule blocks to extract instructors and course info
+    const parsed = parseGeneratedSchedules(doc);
+    const sections = parsed.schedules?.flatMap((s) => s.sections) || [];
+
+    // Collect all unique instructor names from parsed sections
+    const instructorNames = [];
+    sections.forEach((sec) => {
+      (sec.instructors || []).forEach((name) => {
+        if (name && !instructorNames.includes(name)) instructorNames.push(name);
+      });
+    });
+
+    if (instructorNames.length === 0) {
+      // No instructors found in blocks – fall back to manual mode
+      const payload = { viewMode: "manual", schedules: [], courses: [] };
+      STATE.lastSnapshot = payload;
+      chrome.runtime.sendMessage({ type: "RMP_DATA_UPDATE", payload }).catch(() => {});
+      return Promise.resolve(payload);
+    }
+
+    // Fetch RMP data for all discovered instructors, then build course groups
+    return fetchTeacherForNameBatch(instructorNames, {}).then((ratings) => {
+      STATE.ratingsByName = ratings || {};
+      const groups = new Map();
+
+      sections.forEach((sec) => {
+        const courseKey = sec.courseKey || "Other";
+        if (!isValidCourseKey(courseKey)) return;
+        (sec.instructors || []).forEach((profName) => {
+          if (!groups.has(courseKey)) groups.set(courseKey, []);
+          const r = STATE.ratingsByName[profName];
+          const rating = r && !r.notFound ? r : null;
+          const rmpUrl = rating?.legacyId
+            ? `https://www.ratemyprofessors.com/professor/${rating.legacyId}`
+            : null;
+          const fp = sec.blockEl ? assignOrGetRmpId(sec.blockEl) : "gen-" + (++STATE.rmpIdCounter);
+          groups.get(courseKey).push({
+            professorName: profName,
+            avgRating: rating ? Number(rating.avgRating) : null,
+            avgDifficulty: rating ? Number(rating.avgDifficulty) : null,
+            numRatings: rating ? (rating.numRatings || 0) : 0,
+            department: rating?.department || null,
+            sectionId: sec.sectionId || null,
+            timeText: sec.meetingTime || "",
+            elementFingerprint: fp,
+            rmpUrl
+          });
+        });
+      });
+
+      return buildAndEmitCourses(groups);
+    });
   }
   return null;
 }
