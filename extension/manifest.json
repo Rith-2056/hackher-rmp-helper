@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ZooReviews",
-  "version": "0.1.0",
-  "description": "Overlays RateMyProfessors ratings on your school's Schedule Builder and suggests better-rated professors.",
+  "version": "0.2.0",
+  "description": "Overlays RateMyProfessors ratings on your school's Schedule Builder with Liquid Glass UI, Omni-Search (Cmd/Ctrl+K), and inline badges.",
   "permissions": [
     "storage",
     "activeTab",
@@ -22,9 +22,14 @@
       "resources": [
         "content/schedule.js",
         "content/scheduleParser.js",
+        "content/omniSearch.js",
+        "content/spireInjector.js",
         "shared/storage.js",
         "shared/nameMatcher.js",
-        "shared/rmpClient.js"
+        "shared/rmpClient.js",
+        "lib/fuse.min.mjs",
+        "data/professors.json",
+        "styles/liquidGlass.css"
       ]
     }
   ],

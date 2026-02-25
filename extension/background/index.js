@@ -146,6 +146,7 @@ const SEARCH_TEACHERS_QUERY = `
             avgRating
             numRatings
             avgDifficulty
+            wouldTakeAgainPercent
           }
         }
       }
@@ -419,7 +420,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         school: n.school,
         avgRating: n.avgRating,
         numRatings: n.numRatings,
-        avgDifficulty: n.avgDifficulty
+        avgDifficulty: n.avgDifficulty,
+        wouldTakeAgainPercent: n.wouldTakeAgainPercent
       }));
     }
     return undefined;
