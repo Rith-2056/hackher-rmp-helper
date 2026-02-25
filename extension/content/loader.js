@@ -29,15 +29,6 @@
     console.error("[RMP Helper] Failed to load Omni-Search:", e);
   }
 
-  // Load SPIRE Schedule Builder injector
-  try {
-    const spireSrc = chrome.runtime.getURL("content/spireInjector.js");
-    const { initSpireInjector } = await import(spireSrc);
-    await initSpireInjector();
-  } catch (e) {
-    console.error("[RMP Helper] Failed to load SPIRE injector:", e);
-  }
-
   // Load Floating Panel (extension icon click opens it)
   try {
     const panelSrc = chrome.runtime.getURL("content/floatingPanel.js");

@@ -4,8 +4,14 @@ import { normalizeNameForKey, splitName } from "../shared/nameMatcher.js";
 // Default to UMass Amherst — ensures data is always filtered to this school
 const UMASS_AMHERST_SCHOOL_ID = "U2Nob29sLTE1MTM";
 
-// Note: Extension icon click opens the popup (default_popup in manifest).
-// The floating panel can be opened from the popup's "Floating panel" button.
+// Extension icon click toggles the floating panel on the active tab
+chrome.action.onClicked.addListener(async (tab) => {
+  if (tab?.id) {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_FLOATING_PANEL" });
+    } catch (_) {}
+  }
+});
 
 const snapshotByTab = new Map();
 
