@@ -18,24 +18,33 @@ let activeIndex = -1;
 let resultItems = [];
 
 // ─── Load professor data & init Fuse ───────────────────────────────────
+function buildFuseIndex(data) {
+  return new Fuse(data, {
+    keys: [
+      { name: "name", weight: 0.7 },
+      { name: "department", weight: 0.3 }
+    ],
+    threshold: 0.35,
+    includeMatches: true,
+    minMatchCharLength: 2,
+    ignoreLocation: true
+  });
+}
+
 async function loadProfessors() {
   try {
     const url = chrome.runtime.getURL("data/professors.json");
     const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     professors = await resp.json();
-    fuse = new Fuse(professors, {
-      keys: [
-        { name: "name", weight: 0.6 },
-        { name: "department", weight: 0.3 },
-        { name: "rmp_score", weight: 0.1 }
-      ],
-      threshold: 0.35,
-      includeMatches: true,
-      minMatchCharLength: 2,
-      ignoreLocation: true
-    });
+    fuse = buildFuseIndex(professors);
   } catch (e) {
     console.warn("[ZooReviews] Failed to load professors.json:", e);
+    // Initialize with empty data so search shows "no results" instead of "Loading..." forever
+    if (!fuse) {
+      professors = [];
+      fuse = buildFuseIndex(professors);
+    }
   }
 }
 
@@ -279,6 +288,11 @@ function openSearch() {
   isOpen = true;
   createShadowHost();
 
+  // If professors haven't loaded yet, try loading them now
+  if (professors.length === 0) {
+    loadProfessors();
+  }
+
   const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
   const kbdHint = isMac ? "&#8984;K" : "Ctrl+K";
 
@@ -381,7 +395,9 @@ function initKeyboardShortcut() {
 
 // ─── Initialize ────────────────────────────────────────────────────────
 export async function initOmniSearch() {
-  await loadProfessors();
+  // Register keyboard shortcut immediately so it's always available
   initKeyboardShortcut();
+  // Load professor data in background (don't block shortcut registration)
+  await loadProfessors();
   console.log("[ZooReviews] Omni-Search ready (Cmd/Ctrl+K)");
 }
