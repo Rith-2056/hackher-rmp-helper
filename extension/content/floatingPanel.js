@@ -41,9 +41,9 @@ async function storageSetJSON(key, value) {
 
 // Storage keys (must match shared/storage.js)
 const SK = {
-  persistedCourses: "rmp.persistedCourses",
-  persistedAt: "rmp.persistedAt",
-  persistedAddedProfessors: "rmp.persistedAddedProfessors"
+  persistedCourses: "persisted.courses",
+  persistedAt: "persisted.at",
+  persistedAddedProfessors: "persisted.addedProfessors"
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────

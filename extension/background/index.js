@@ -25,7 +25,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       Storage.setJSON(StorageKeys.persistedCourses, payload.courses).catch(() => {});
       Storage.set(StorageKeys.persistedAt, Date.now()).catch(() => {});
     }
+    // Broadcast to extension pages (popup, sidepanel)
     chrome.runtime.sendMessage({ type: "RMP_DATA_UPDATE", payload }).catch(() => {});
+    // Relay to content scripts in the same tab so the floating panel gets live updates
+    if (tabId != null) {
+      chrome.tabs.sendMessage(tabId, { type: "RMP_DATA_UPDATE", payload }).catch(() => {});
+    }
     return false;
   }
   if (msg.type === "OPEN_RECOMMENDATIONS") {
@@ -370,7 +375,14 @@ function simplifyTeacher(t) {
   };
 }
 
+const API_MESSAGE_TYPES = new Set([
+  "RMP_FETCH_BATCH", "RMP_FETCH_TEACHER", "CFG_GET", "CFG_SET",
+  "CACHE_CLEAR", "RMP_FETCH_ALTERNATIVES", "RMP_FETCH_ALL_FOR_SUBJECT",
+  "RMP_SEARCH_TEACHERS"
+]);
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!API_MESSAGE_TYPES.has(msg.type)) return; // Let other listeners handle it
   const handler = async () => {
     if (msg.type === "RMP_FETCH_BATCH") {
       const { names, options } = msg.payload || {};
