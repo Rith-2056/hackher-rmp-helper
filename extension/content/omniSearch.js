@@ -4,6 +4,7 @@
  */
 
 import Fuse from "../lib/fuse.min.mjs";
+import { searchProfessors } from "../shared/rmpClient.js";
 
 const RECENTLY_VIEWED_KEY = "omni.recentlyViewed";
 const MAX_RECENT = 8;
@@ -16,6 +17,7 @@ let hostEl = null;
 let isOpen = false;
 let activeIndex = -1;
 let resultItems = [];
+let searchToken = 0;
 
 // ─── Load professor data & init Fuse ───────────────────────────────────
 function buildFuseIndex(data) {
@@ -124,6 +126,22 @@ function getTrendingProfessors() {
     .slice(0, 6);
 }
 
+function isUMassProfessor(r) {
+  const name = (r?.school?.name || "").toLowerCase();
+  return name.includes("massachusetts") || name.includes("umass") || name.includes("amherst");
+}
+
+function mapRmpToOmniProf(r) {
+  return {
+    name: r.name || `${r.firstName || ""} ${r.lastName || ""}`.trim(),
+    department: r.department || "",
+    rmp_score: r.avgRating ?? null,
+    difficulty: r.avgDifficulty ?? null,
+    num_ratings: r.numRatings ?? 0,
+    legacyId: r.legacyId || null
+  };
+}
+
 // ─── Build the Shadow DOM ──────────────────────────────────────────────
 function createShadowHost() {
   if (hostEl) return;
@@ -141,7 +159,8 @@ function createShadowHost() {
 }
 
 // ─── Render search results ─────────────────────────────────────────────
-function renderResults(query) {
+async function renderResults(query) {
+  const token = ++searchToken;
   const container = shadowRoot.querySelector(".lg-results");
   if (!container) return;
 
@@ -149,8 +168,9 @@ function renderResults(query) {
   activeIndex = -1;
   resultItems = [];
 
-  if (!query || query.trim().length === 0) {
-    renderEmptyState(container);
+  const trimmed = (query || "").trim();
+  if (!trimmed) {
+    await renderEmptyState(container);
     return;
   }
 
@@ -159,10 +179,46 @@ function renderResults(query) {
     return;
   }
 
-  const results = fuse.search(query).slice(0, MAX_RESULTS);
+  const fuseResults = fuse.search(trimmed);
+  const combined = [];
+  const seenNames = new Set();
 
-  if (results.length === 0) {
-    container.innerHTML = `<div class="lg-no-results"><div class="lg-no-results-icon">&#128269;</div>No professors found for &ldquo;${escapeHtml(query)}&rdquo;</div>`;
+  fuseResults.forEach((result) => {
+    const prof = result.item;
+    const nameKey = (prof.name || "").toLowerCase();
+    if (nameKey && !seenNames.has(nameKey)) {
+      seenNames.add(nameKey);
+      combined.push({
+        prof,
+        nameMatch: result.matches?.find(m => m.key === "name")
+      });
+    }
+  });
+
+  // If we still have room, augment with live RMP search results
+  if (combined.length < MAX_RESULTS) {
+    try {
+      const live = await searchProfessors(trimmed);
+      if (token !== searchToken) return; // stale response
+      const filtered = (live || [])
+        .filter(isUMassProfessor)
+        .map(mapRmpToOmniProf)
+        .filter((p) => {
+          const key = (p.name || "").toLowerCase();
+          return key && !seenNames.has(key);
+        });
+      filtered.slice(0, MAX_RESULTS - combined.length).forEach((prof) => {
+        const key = (prof.name || "").toLowerCase();
+        seenNames.add(key);
+        combined.push({ prof, nameMatch: null });
+      });
+    } catch (e) {
+      console.warn("[ZooReviews] Omni-Search live lookup failed:", e);
+    }
+  }
+
+  if (combined.length === 0) {
+    container.innerHTML = `<div class="lg-no-results"><div class="lg-no-results-icon">&#128269;</div>No professors found for &ldquo;${escapeHtml(trimmed)}&rdquo;</div>`;
     return;
   }
 
@@ -171,9 +227,7 @@ function renderResults(query) {
   label.textContent = "Professors";
   container.appendChild(label);
 
-  results.forEach((result, idx) => {
-    const prof = result.item;
-    const nameMatch = result.matches?.find(m => m.key === "name");
+  combined.slice(0, MAX_RESULTS).forEach(({ prof, nameMatch }, idx) => {
     const item = document.createElement("div");
     item.className = "lg-result-item";
     item.dataset.index = idx;

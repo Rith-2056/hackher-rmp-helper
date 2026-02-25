@@ -3,6 +3,8 @@ import { normalizeNameForKey, splitName } from "../shared/nameMatcher.js";
 
 // Default to UMass Amherst — ensures data is always filtered to this school
 const UMASS_AMHERST_SCHOOL_ID = "U2Nob29sLTE1MTM";
+// RMP sometimes uses alternate encodings/IDs for the same school; keep a small allow‑list.
+const UMASS_SCHOOL_IDS = new Set(["U2Nob29sLTE1MTM", "U2Nob29sOjE1MTM", "1513"]);
 
 // Extension icon click toggles the floating panel on the active tab
 chrome.action.onClicked.addListener(async (tab) => {
@@ -122,27 +124,36 @@ function sleep(ms) {
 }
 
 async function rmpGraphQL(query, variables = {}) {
-  const res = await fetch("https://www.ratemyprofessors.com/graphql", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "accept": "*/*",
-      "Authorization": "Basic dGVzdDp0ZXN0",
-      "Referer": "https://www.ratemyprofessors.com/"
-    },
-    body: JSON.stringify({
-      query,
-      variables
-    }),
-    credentials: "omit",
-    redirect: "follow"
-  });
+  let res;
+  try {
+    res = await fetch("https://www.ratemyprofessors.com/graphql", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "accept": "*/*",
+        // Modern RMP GraphQL does not require a basic auth header; rely on Referer instead.
+        "Referer": "https://www.ratemyprofessors.com/"
+      },
+      body: JSON.stringify({
+        query,
+        variables
+      }),
+      credentials: "omit",
+      redirect: "follow"
+    });
+  } catch (e) {
+    console.warn("RMP GraphQL network error:", e);
+    throw e;
+  }
   if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.warn("RMP GraphQL HTTP error", res.status, text.slice(0, 200));
     throw new Error(`RMP GraphQL HTTP ${res.status}`);
   }
   const data = await res.json();
   if (data.errors) {
-    throw new Error(`RMP GraphQL errors: ${JSON.stringify(data.errors).slice(0, 300)}`);
+    console.warn("RMP GraphQL errors:", data.errors);
+    throw new Error("RMP GraphQL errors");
   }
   return data.data;
 }
@@ -322,11 +333,17 @@ async function getCachedOrFetchRating(schoolId, scheduleName) {
   }
 
   const candidates = await searchTeachersByName(scheduleName, schoolId);
-  // When a school is configured, only accept professors from that school.
-  // Never fall back to another school — that would show the wrong person.
-  const pool = schoolId
-    ? candidates.filter((c) => c.school?.id === schoolId)
-    : candidates;
+  // When a school is configured, prefer professors from that school / known UMass IDs,
+  // but gracefully fall back if RMP changes the internal ID format.
+  let pool;
+  if (schoolId) {
+    pool = candidates.filter((c) => c.school?.id === schoolId);
+    if (pool.length === 0 && UMASS_SCHOOL_IDS.has(schoolId)) {
+      pool = candidates.filter((c) => UMASS_SCHOOL_IDS.has(c.school?.id));
+    }
+  } else {
+    pool = candidates;
+  }
   if (pool.length === 0) {
     await Storage.setWithTTL(cacheKey, { notFound: true }, ttlMs);
     return { notFound: true };
