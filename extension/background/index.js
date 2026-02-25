@@ -1,7 +1,27 @@
 import { Storage, StorageKeys, cacheKeyForProfessor } from "../shared/storage.js";
 import { normalizeNameForKey, splitName } from "../shared/nameMatcher.js";
 
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+// When the extension icon is clicked, toggle the floating panel in the active tab
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!tab?.id) return;
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_FLOATING_PANEL" });
+  } catch (_) {
+    // Content script might not be loaded yet — inject it first
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["content/loader.js"]
+      });
+      // Retry after a short delay
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_FLOATING_PANEL" }).catch(() => {});
+      }, 500);
+    } catch (e) {
+      console.warn("[ZooReviews] Could not inject content script:", e);
+    }
+  }
+});
 
 const snapshotByTab = new Map();
 
@@ -21,8 +41,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "OPEN_RECOMMENDATIONS") {
     (async () => {
       try {
-        const win = await chrome.windows.getCurrent();
-        if (win?.id) await chrome.sidePanel.open({ windowId: win.id });
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) {
+          await chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_FLOATING_PANEL" });
+        }
       } catch (_) {}
       sendResponse({ ok: true });
     })();

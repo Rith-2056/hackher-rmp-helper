@@ -201,11 +201,13 @@ function showRecommendations(professors) {
   responseEl.textContent = recs.join("\n\n");
 }
 
-async function openRecommendationsDrawer() {
+async function openFloatingPanel() {
   const tabId = await getActiveTabId();
   if (!tabId) return;
   try {
-    await chrome.tabs.sendMessage(tabId, { type: "OPEN_RECOMMENDATIONS" });
+    await chrome.tabs.sendMessage(tabId, { type: "TOGGLE_FLOATING_PANEL" });
+    // Close the popup after opening the floating panel
+    window.close();
   } catch (e) {
     console.warn("[RMP Helper]", e.message);
   }
@@ -216,7 +218,7 @@ async function init() {
   renderProfessors(professors);
 
   document.getElementById("btnReco").addEventListener("click", () => showRecommendations(professors));
-  document.getElementById("btnDrawer").addEventListener("click", openRecommendationsDrawer);
+  document.getElementById("btnDrawer").addEventListener("click", openFloatingPanel);
 }
 
 init();
