@@ -31,3 +31,10 @@ Outputs `build/rmp-helper.zip` for packaging.
 ## License
 MIT – see `LICENSE`.
 
+## Tech Stack
+- **Chrome Extension (Manifest V3)**: background service worker, content scripts, side panel, and options page.
+- **JavaScript (ES modules)**: vanilla JS for DOM integration with Schedule Builder and message passing.
+- **HTML/CSS**: UI for injected overlays, side panel, popup, and options.
+- **Chrome Extension APIs**: `storage`, `tabs`, `activeTab`, and `sidePanel` for data and UI integration.
+- **RateMyProfessors GraphQL API**: fetched via background worker with simple caching.
+
