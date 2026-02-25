@@ -17,7 +17,7 @@ const STATE = {
   debounceMs: 400
 };
 
-const NAME_RE = /^[A-Z][a-z]+(?:\s[A-Z][a-z]+){1,3}$/;
+const NAME_RE = /^[A-Z][a-zA-Z]*(?:[-'][A-Za-z]+)*(?:\s[A-Z][a-zA-Z]*(?:[-'][A-Za-z]+)*){1,3}$/;
 const NON_NAME_WORDS = new Set([
   "Campus", "Amherst", "Main", "North", "South", "East", "West",
   "Online", "Remote", "Virtual", "Honors", "Spring", "Fall", "Summer",
@@ -31,6 +31,19 @@ const NON_NAME_WORDS = new Set([
 function isPersonName(text) {
   if (!NAME_RE.test(text)) return false;
   return !text.split(/\s+/).some((w) => NON_NAME_WORDS.has(w));
+}
+
+/** Normalize "Last, First" or "Last,First" format to "First Last". Strips trailing periods. */
+function normalizeInstructorName(text) {
+  let t = (text || "").trim();
+  // Handle "Last, First" or "Last, First Middle" format
+  const commaMatch = t.match(/^([A-Z][a-zA-Z'-]+)\s*,\s*(.+)$/);
+  if (commaMatch) {
+    t = `${commaMatch[2].trim()} ${commaMatch[1].trim()}`;
+  }
+  // Strip periods from initials (e.g., "John W. Smith" → "John W Smith")
+  t = t.replace(/\./g, "").replace(/\s+/g, " ").trim();
+  return t;
 }
 
 function hostMatchesConfiguredDomain(cfgDomain) {
@@ -131,7 +144,10 @@ const CALENDAR_BLOCK_SEL = "[class*='fc-event'],[class*='rbc-event'],[class*='ev
 
 function isCourseListTable(table) {
   return [...(table.querySelectorAll?.("th") || [])].some(
-    (th) => ["Instructor", "Professor"].includes(normalizeWhitespace(th.textContent || ""))
+    (th) => {
+      const text = normalizeWhitespace(th.textContent || "").toLowerCase();
+      return text.includes("instructor") || text.includes("professor");
+    }
   );
 }
 
@@ -220,24 +236,30 @@ function* walkElementsIncludingShadow(root) {
 
 function findInstructorColumnCells(doc) {
   const cells = new Map();
-  const headerLabels = ["Instructor", "Professor"];
   try {
     doc.querySelectorAll("table").forEach((table) => {
       const instructorTh = [...table.querySelectorAll("th")].find(
-        (th) => headerLabels.includes(normalizeWhitespace(th.textContent))
+        (th) => {
+          const text = normalizeWhitespace(th.textContent).toLowerCase();
+          return text.includes("instructor") || text.includes("professor") || text === "faculty";
+        }
       );
       if (!instructorTh) return;
       const thRect = instructorTh.getBoundingClientRect();
       if (thRect.width === 0) return;
       table.querySelectorAll("tbody tr").forEach((tr) => {
         [...tr.cells].forEach((td) => {
-          if (td.querySelector("button, a")) return;
           const tdRect = td.getBoundingClientRect();
           if (tdRect.width < 40) return;
           const centerX = tdRect.left + tdRect.width / 2;
           if (centerX < thRect.left || centerX > thRect.right) return;
-          let raw = normalizeWhitespace(td.textContent || "");
+          // Prefer link text (handles SPIRE-style linked instructor names)
+          const anchor = td.querySelector("a");
+          let raw = anchor
+            ? normalizeWhitespace(anchor.textContent || "")
+            : normalizeWhitespace(td.textContent || "");
           raw = raw.replace(/\s*\d+\.\d+\s*·\s*Diff\s*[\d.]+\s*\(\d+\)\s*$/i, "").replace(/\s*RMP\s*n\/a\s*$/i, "").trim();
+          raw = normalizeInstructorName(raw);
           if (!raw || !isPersonName(raw)) return;
           if (/\d{1,2}:\d{2}\s*(am|pm)|(mon|tue|wed|thu|fri|sat|sun)[a-z]*\s+\d/i.test(raw)) return;
           if (/^[A-Z]{2,6}\s+\d{2,4}[A-Z]?$/i.test(raw)) return;
@@ -523,7 +545,7 @@ function runScanGeneratedSchedules() {
   const roots = getSearchRoots();
   for (const doc of roots) {
     const ctx = detectPageContext(doc, location.href);
-    if (ctx !== "generatedSchedules" && ctx !== "buildSchedule") continue;
+    if (ctx !== "generatedSchedules") continue;
 
     // Parse schedule blocks to extract instructors and course info
     const parsed = parseGeneratedSchedules(doc);
@@ -598,6 +620,15 @@ function runScanAndNotify(immediate = false) {
 }
 
 function doRunScanAndNotify() {
+  // Skip build schedule pages entirely to avoid extracting incorrect data
+  const pageContext = detectPageContext(document, location.href);
+  if (pageContext === "buildSchedule") {
+    const payload = { courses: [] };
+    STATE.lastSnapshot = payload;
+    chrome.runtime.sendMessage({ type: "RMP_DATA_UPDATE", payload }).catch(() => {});
+    return Promise.resolve(payload);
+  }
+
   const genResult = runScanGeneratedSchedules();
   if (genResult) {
     if (typeof genResult.then === "function") return genResult;
