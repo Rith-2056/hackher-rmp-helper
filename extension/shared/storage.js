@@ -46,7 +46,10 @@ export const StorageKeys = {
   geminiApiKey: "cfg.geminiApiKey",
   manualMappings: "cfg.manualMappings", // { normalizedScheduleName: rmpTeacherId }
   ratingsCachePrefix: "cache.prof.",    // + composite key
-  cacheTTLms: "cfg.cacheTTLms"
+  cacheTTLms: "cfg.cacheTTLms",
+  persistedCourses: "persisted.courses",                    // scraped courses from schedule page
+  persistedAt: "persisted.at",                              // epoch ms of last successful scrape
+  persistedAddedProfessors: "persisted.addedProfessors"     // manually-added professors
 };
 
 export async function getWeights() {

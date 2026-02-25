@@ -1,4 +1,5 @@
 import { searchProfessors, fetchTeacherForNameBatch } from "../shared/rmpClient.js";
+import { Storage, StorageKeys } from "../shared/storage.js";
 
 /** UMass Amherst RMP School IDs – try multiple formats (GraphQL format varies) */
 const UMAS_SCHOOL_IDS = ["U2Nob29sLTE1MTM", "U2Nob29sOjE1MTM", "1513"];
@@ -99,6 +100,12 @@ function render(state) {
   const container = document.getElementById("courseList");
   const emptyEl = document.getElementById("emptyMsg");
   const headerEl = document.getElementById("scheduleHeader");
+  const cacheBadge = document.getElementById("cacheBadge");
+
+  // Show/hide the "saved from last schedule visit" badge
+  if (cacheBadge) {
+    cacheBadge.style.display = state?._fromCache ? "block" : "none";
+  }
 
   const isManual = state?.viewMode === "manual";
   const hasScrapedSchedules = state?.viewMode === "generated" && state?.schedules?.length > 0;
@@ -229,7 +236,7 @@ function renderSearchResultCard(prof, showAddButton) {
   `;
 }
 
-function addProfessorToSchedule(prof) {
+async function addProfessorToSchedule(prof) {
   const existing = STATE.addedProfessors.find((p) =>
     (p.name || "").toLowerCase() === (prof.name || "").toLowerCase()
   );
@@ -245,18 +252,28 @@ function addProfessorToSchedule(prof) {
     school: prof.school
   };
   STATE.addedProfessors.push(entry);
+  await persistAddedProfessors();
   const snap = STATE.snapshot || { viewMode: "manual", schedules: [], courses: [] };
   if (!snap.viewMode) snap.viewMode = "manual";
   render(snap);
 }
 
-function removeProfessorFromSchedule(professorName) {
+async function removeProfessorFromSchedule(professorName) {
   STATE.addedProfessors = STATE.addedProfessors.filter(
     (p) => (p.name || "").toLowerCase() !== (professorName || "").toLowerCase()
   );
+  await persistAddedProfessors();
   const snap = STATE.snapshot || { viewMode: "manual", schedules: [], courses: [] };
   if (!snap.viewMode) snap.viewMode = "manual";
   render(snap);
+}
+
+async function persistAddedProfessors() {
+  try {
+    await Storage.setJSON(StorageKeys.persistedAddedProfessors, STATE.addedProfessors);
+  } catch (e) {
+    console.warn("[ZooReviews] Could not persist added professors:", e);
+  }
 }
 
 async function runSearch(query) {
@@ -307,10 +324,36 @@ async function runSearch(query) {
 }
 
 let dropdownDebounce = null;
+let ddActiveIndex = -1;
+
+// Highlight the matched part of a professor's name in the dropdown
+function highlightMatch(text, query) {
+  if (!text || !query) return escapeHtml(text);
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const idx = lowerText.indexOf(lowerQuery);
+  if (idx === -1) return escapeHtml(text);
+  const before = escapeHtml(text.substring(0, idx));
+  const match = escapeHtml(text.substring(idx, idx + query.length));
+  const after = escapeHtml(text.substring(idx + query.length));
+  return `${before}<strong>${match}</strong>${after}`;
+}
+
+// Update active suggestion styling and scroll into view
+function setDropdownActive(items, index) {
+  items.forEach((el, i) => {
+    el.classList.toggle("search-dropdown-item--active", i === index);
+  });
+  if (items[index]) {
+    items[index].scrollIntoView({ block: "nearest" });
+  }
+}
 
 async function updateDropdown(query) {
   const trimmed = (query || "").trim();
   const dropdownEl = document.getElementById("searchDropdown");
+  ddActiveIndex = -1;  // Reset active index on every new search
+
   if (trimmed.length < 2) {
     dropdownEl.style.display = "none";
     dropdownEl.innerHTML = "";
@@ -333,7 +376,15 @@ async function updateDropdown(query) {
       dropdownEl.innerHTML = list
         .map((p) => {
           const name = p.name || "";
-          return `<div class="search-dropdown-item" data-prof-name="${escapeHtml(name)}">${escapeHtml(name)}</div>`;
+          const dept = p.department ? `<span class="dd-dept">${escapeHtml(p.department)}</span>` : "";
+          const rating = typeof p.avgRating === "number"
+            ? `<span class="dd-rating">⭐ ${p.avgRating.toFixed(1)}</span>` : "";
+          const highlighted = highlightMatch(name, trimmed);
+          return `
+            <div class="search-dropdown-item" data-prof-name="${escapeHtml(name)}" tabindex="-1">
+              <span class="dd-name">${highlighted}</span>
+              <span class="dd-meta">${dept}${rating}</span>
+            </div>`;
         })
         .join("");
       dropdownEl.style.display = "block";
@@ -350,16 +401,38 @@ async function updateDropdown(query) {
       dropdownEl.style.display = "none";
       dropdownEl.innerHTML = "";
     }
-  }, 250);
+  }, 200);
 }
 
 async function refresh() {
-  const snap = await requestSnapshot();
+  let snap = await requestSnapshot();
+  // If background returned no live courses and no stored courses via the background fallback,
+  // try loading persisted courses directly from storage (sidepanel direct access)
+  if ((!snap?.courses?.length) && !snap?._fromCache) {
+    try {
+      const savedCourses = await Storage.getJSON(StorageKeys.persistedCourses);
+      if (savedCourses?.length > 0) {
+        snap = { courses: savedCourses, _fromCache: true };
+      }
+    } catch (e) {
+      console.warn("[ZooReviews] Could not load persisted courses:", e);
+    }
+  }
   STATE.snapshot = snap;
   render(snap);
 }
 
 async function init() {
+  // Load persisted added professors from storage before first render
+  try {
+    const saved = await Storage.getJSON(StorageKeys.persistedAddedProfessors);
+    if (Array.isArray(saved) && saved.length > 0) {
+      STATE.addedProfessors = saved;
+    }
+  } catch (e) {
+    console.warn("[ZooReviews] Could not load persisted added professors:", e);
+  }
+
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === "RMP_DATA_UPDATE" && msg.payload) {
       STATE.snapshot = msg.payload;
@@ -375,6 +448,41 @@ async function init() {
   btnSearch.addEventListener("click", () => runSearch(searchInput.value));
 
   searchInput.addEventListener("keydown", (e) => {
+    const dropdown = document.getElementById("searchDropdown");
+    const items = [...dropdown.querySelectorAll(".search-dropdown-item")];
+
+    // Handle arrow keys and enter only when dropdown is open
+    if (dropdown.style.display !== "none" && items.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        ddActiveIndex = (ddActiveIndex + 1) % items.length;
+        setDropdownActive(items, ddActiveIndex);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        ddActiveIndex = (ddActiveIndex - 1 + items.length) % items.length;
+        setDropdownActive(items, ddActiveIndex);
+        return;
+      }
+      if (e.key === "Enter" && ddActiveIndex >= 0) {
+        e.preventDefault();
+        const name = items[ddActiveIndex].dataset.profName;
+        searchInput.value = name;
+        dropdown.style.display = "none";
+        runSearch(name);
+        return;
+      }
+    }
+
+    // Handle escape key to close dropdown
+    if (e.key === "Escape") {
+      dropdown.style.display = "none";
+      ddActiveIndex = -1;
+      return;
+    }
+
+    // Handle enter when no item is selected
     if (e.key === "Enter") {
       e.preventDefault();
       runSearch(searchInput.value);

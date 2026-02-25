@@ -10,6 +10,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const tabId = sender.tab?.id;
     const payload = msg.payload || { courses: [] };
     if (tabId != null) snapshotByTab.set(tabId, payload);
+    // Persist to storage when real courses are present
+    if (payload.courses?.length > 0) {
+      Storage.setJSON(StorageKeys.persistedCourses, payload.courses).catch(() => {});
+      Storage.set(StorageKeys.persistedAt, Date.now()).catch(() => {});
+    }
     chrome.runtime.sendMessage({ type: "RMP_DATA_UPDATE", payload }).catch(() => {});
     return false;
   }
@@ -25,18 +30,35 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === "RMP_REQUEST_SNAPSHOT") {
     (async () => {
+      // Helper: load persisted courses from storage and respond
+      const respondFromStorage = async () => {
+        const savedCourses = await Storage.getJSON(StorageKeys.persistedCourses);
+        if (savedCourses?.length > 0) {
+          sendResponse({ courses: savedCourses, _fromCache: true });
+        } else {
+          sendResponse({ courses: [] });
+        }
+      };
+
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) {
-        sendResponse({ courses: [] });
+        await respondFromStorage();
         return;
       }
+
       const cached = snapshotByTab.get(tab.id);
       try {
         const snap = await chrome.tabs.sendMessage(tab.id, { type: "RMP_REQUEST_SNAPSHOT" }, { frameId: 0 });
         if (snap?.courses) snapshotByTab.set(tab.id, snap);
+        // Live data is good - respond with it
         sendResponse(snap || cached || { courses: [] });
       } catch (e) {
-        sendResponse(cached || { courses: [] });
+        // Tab is not the schedule page - use in-memory cache then fall back to storage
+        if (cached?.courses?.length > 0) {
+          sendResponse(cached);
+        } else {
+          await respondFromStorage();
+        }
       }
     })();
     return true;
@@ -87,7 +109,9 @@ async function rmpGraphQL(query, variables = {}) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "accept": "*/*"
+      "accept": "*/*",
+      "Authorization": "Basic dGVzdDp0ZXN0",
+      "Referer": "https://www.ratemyprofessors.com/"
     },
     body: JSON.stringify({
       query,
