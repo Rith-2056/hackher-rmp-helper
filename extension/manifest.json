@@ -41,8 +41,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "ZooReviews",
-    "default_popup": "popup/popup.html"
+    "default_title": "ZooReviews"
   },
   "options_page": "options/options.html",
   "content_scripts": [
