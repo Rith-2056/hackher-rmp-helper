@@ -131,7 +131,7 @@ async function rmpGraphQL(query, variables = {}) {
       headers: {
         "content-type": "application/json",
         "accept": "*/*",
-        // Modern RMP GraphQL does not require a basic auth header; rely on Referer instead.
+        "Authorization": "Basic dGVzdDp0ZXN0",
         "Referer": "https://www.ratemyprofessors.com/"
       },
       body: JSON.stringify({
@@ -344,13 +344,15 @@ async function getCachedOrFetchRating(schoolId, scheduleName) {
   } else {
     pool = candidates;
   }
+  // Use a shorter TTL for notFound so failed lookups are retried sooner
+  const notFoundTtlMs = 60 * 60 * 1000; // 1 hour
   if (pool.length === 0) {
-    await Storage.setWithTTL(cacheKey, { notFound: true }, ttlMs);
+    await Storage.setWithTTL(cacheKey, { notFound: true }, notFoundTtlMs);
     return { notFound: true };
   }
   const best = pickBestCandidate(scheduleName, pool);
   if (!best) {
-    await Storage.setWithTTL(cacheKey, { notFound: true }, ttlMs);
+    await Storage.setWithTTL(cacheKey, { notFound: true }, notFoundTtlMs);
     return { notFound: true };
   }
   await Storage.setWithTTL(cacheKey, best, ttlMs);

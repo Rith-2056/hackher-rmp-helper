@@ -26,7 +26,7 @@ function buildFuseIndex(data) {
       { name: "name", weight: 0.7 },
       { name: "department", weight: 0.3 }
     ],
-    threshold: 0.35,
+    threshold: 0.4,
     includeMatches: true,
     minMatchCharLength: 2,
     ignoreLocation: true
