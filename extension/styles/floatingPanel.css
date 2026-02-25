@@ -486,14 +486,14 @@
   transform: translateY(-1px) scale(1.04);
 }
 
-/* Rating pill colors */
-.fp-pill-na { background: rgba(120, 115, 125, 0.85); color: rgba(255, 255, 255, 0.9); }
-.fp-pill-red { background: linear-gradient(145deg, #c92a2a, #a61e1e); color: #fff5f5; }
-.fp-pill-red-yellow { background: linear-gradient(145deg, #d97706, #b45309); color: #fffbeb; }
-.fp-pill-yellow { background: linear-gradient(145deg, #ca8a04, #a16207); color: #1c1917; }
-.fp-pill-yellow-green { background: linear-gradient(145deg, #84cc16, #65a30d, #4d7c0f); color: #1a2e05; }
-.fp-pill-light-green { background: linear-gradient(145deg, #22c55e, #16a34a); color: #052e16; }
-.fp-pill-bold-green { background: linear-gradient(145deg, #15803d, #14532d); color: #bbf7d0; }
+/* Rating pill colors — deeper, more saturated for liquid glass effect */
+.fp-pill-na { background: linear-gradient(145deg, rgba(120, 115, 125, 0.92), rgba(90, 85, 95, 0.88)); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+.fp-pill-red { background: linear-gradient(145deg, #dc2626, #b91c1c); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+.fp-pill-red-yellow { background: linear-gradient(145deg, #ea580c, #c2410c); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+.fp-pill-yellow { background: linear-gradient(145deg, #d97706, #b45309); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+.fp-pill-yellow-green { background: linear-gradient(145deg, #65a30d, #4d7c0f); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+.fp-pill-light-green { background: linear-gradient(145deg, #16a34a, #15803d); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+.fp-pill-bold-green { background: linear-gradient(145deg, #15803d, #166534); color: #d1fae5; text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
 
 .fp-pill-diff,
 .fp-pill-count {

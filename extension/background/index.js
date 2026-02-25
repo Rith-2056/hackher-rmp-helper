@@ -1,27 +1,11 @@
 import { Storage, StorageKeys, cacheKeyForProfessor } from "../shared/storage.js";
 import { normalizeNameForKey, splitName } from "../shared/nameMatcher.js";
 
-// When the extension icon is clicked, toggle the floating panel in the active tab
-chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab?.id) return;
-  try {
-    await chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_FLOATING_PANEL" });
-  } catch (_) {
-    // Content script might not be loaded yet — inject it first
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ["content/loader.js"]
-      });
-      // Retry after a short delay
-      setTimeout(() => {
-        chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_FLOATING_PANEL" }).catch(() => {});
-      }, 500);
-    } catch (e) {
-      console.warn("[ZooReviews] Could not inject content script:", e);
-    }
-  }
-});
+// Default to UMass Amherst — ensures data is always filtered to this school
+const UMASS_AMHERST_SCHOOL_ID = "U2Nob29sLTE1MTM";
+
+// Note: Extension icon click opens the popup (default_popup in manifest).
+// The floating panel can be opened from the popup's "Floating panel" button.
 
 const snapshotByTab = new Map();
 
@@ -384,11 +368,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handler = async () => {
     if (msg.type === "RMP_FETCH_BATCH") {
       const { names, options } = msg.payload || {};
-      // Use nullish coalescing: if schoolId is explicitly provided (even as null), respect it;
-      // only fall back to stored config when schoolId is undefined (not provided at all).
-      const schoolId = (options && "schoolId" in options)
+      // Always default to UMass Amherst to ensure we only get UMass professors
+      const schoolId = (options && "schoolId" in options && options.schoolId)
         ? options.schoolId
-        : (await Storage.get(StorageKeys.rmpSchoolId)) || null;
+        : (await Storage.get(StorageKeys.rmpSchoolId)) || UMASS_AMHERST_SCHOOL_ID;
       const out = {};
       for (const name of names || []) {
         out[name] = await getCachedOrFetchRating(schoolId, name);
@@ -421,17 +404,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg.type === "RMP_FETCH_ALTERNATIVES") {
       const { course, currentProfessorName, currentRating, schoolId: sid } = msg.payload || {};
-      const schoolId = sid || (await Storage.get(StorageKeys.rmpSchoolId));
+      const schoolId = sid || (await Storage.get(StorageKeys.rmpSchoolId)) || UMASS_AMHERST_SCHOOL_ID;
       return fetchAlternativesForCourse(course, currentProfessorName, currentRating, schoolId);
     }
     if (msg.type === "RMP_FETCH_ALL_FOR_SUBJECT") {
       const { subject, schoolId: sid } = msg.payload || {};
-      const schoolId = sid || (await Storage.get(StorageKeys.rmpSchoolId));
+      const schoolId = sid || (await Storage.get(StorageKeys.rmpSchoolId)) || UMASS_AMHERST_SCHOOL_ID;
       return fetchAllProfessorsForSubject(subject, schoolId);
     }
     if (msg.type === "RMP_SEARCH_TEACHERS") {
       const { text, schoolId: sid } = msg.payload || {};
-      const schoolId = sid || (await Storage.get(StorageKeys.rmpSchoolId));
+      const schoolId = sid || (await Storage.get(StorageKeys.rmpSchoolId)) || UMASS_AMHERST_SCHOOL_ID;
       const trimmed = (text || "").trim();
       if (!trimmed || trimmed.length < 2) return [];
       const nodes = await searchTeachersByName(trimmed, schoolId);
